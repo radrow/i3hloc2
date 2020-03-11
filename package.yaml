@@ -1,0 +1,66 @@
+name:                i3hloc
+version:             0.1.0.0
+github:              "radrow/i3hloc"
+license:             BSD3
+author:              "Radosław Rowicki"
+maintainer:          "ikciwor [fancy a] ymail [dot] [short for commercial]"
+copyright:           "Radosław Rowicki"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+synopsis:            Flexible scheduler for i3bar
+category:            Utils
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/radrow/i3hloc#readme>
+
+dependencies:
+  - base >= 4.7 && < 5
+  - filepath
+  - strict
+
+default-extensions:
+  - LambdaCase
+
+library:
+  source-dirs: src
+  dependencies:
+    - mtl
+    - aeson
+    - text
+    - bytestring
+    - time
+    - process
+    - clock
+    - X11
+    - unix
+    - alsa-mixer
+
+executables:
+  i3hloc:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -O2
+      - -Wall
+      - -Wmissed-specialisations
+      - -Wall-missed-specialisations
+      - -Wincomplete-uni-patterns
+      - -Wincomplete-record-updates
+      - -Wmonomorphism-restriction
+      - -Wmissing-local-signatures
+      - -Wmissing-export-lists
+      - -Wmissing-home-modules
+      - -Widentities
+      - -Wredundant-constraints
+      - -Wpartial-fields
+    dependencies:
+    - i3hloc
