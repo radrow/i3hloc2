@@ -4,7 +4,7 @@ module Hloc.Blocks.Backlight
 
 import           Control.Applicative
 import           System.Clock
-import           System.FilePath.Posix
+import           System.FilePath
 import           System.IO             hiding (hGetContents)
 import           System.IO.Strict
 import           Text.Read
