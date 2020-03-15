@@ -1,15 +1,13 @@
-{-# LANGUAGE GADTs         #-}
-{-# LANGUAGE RankNTypes    #-}
-{-# LANGUAGE TypeFamilies  #-}
-{-# LANGUAGE TypeOperators #-}
 module Hloc.Hloc where
 
 import           Control.Concurrent
 import           Control.Monad.State
 import           Data.Aeson
 import qualified Data.ByteString.Lazy.Char8 as BS
+import           System.IO
 
 import           Hloc.Block
+import           Hloc.I3Bar
 import           Hloc.Worker
 
 
@@ -32,8 +30,8 @@ createWorker block = do
   modify (\s -> s{workers = (threadId, blockMV):workers s})
 
 
-runHloc :: [Block] -> IO ()
-runHloc inits = do
+runHloc :: I3BarHeader -> [Block] -> IO ()
+runHloc header inits = do
   s <- newQSem 0
   let initState = Hloc
         { semaphore = s
@@ -41,6 +39,10 @@ runHloc inits = do
         }
   flip evalStateT initState $ do
     forM_ inits createWorker
+    liftIO $ do
+      BS.putStrLn $ encode (toJSON header)
+      BS.putStrLn $ BS.pack "["
+      hFlush stdout
     loopHloc
 
 loopHloc :: HlocM ()
@@ -55,4 +57,7 @@ loopHloc = forever $ do
 printBlocks :: [Block] -> HlocM ()
 printBlocks blocks = do
   let jsons = concatMap serialize blocks
-  liftIO $ BS.putStrLn $ encode $ toJSON jsons
+      encoded = encode $ toJSON jsons
+  liftIO $ do
+    BS.putStrLn $ encoded <> BS.pack ","
+    hFlush stdout
