@@ -1,27 +1,31 @@
 module Hloc.Blocks.SystemCommand(systemCommandSimple) where
 
+import Data.Text
 import Hloc.Block
 import System.Process
 
 data SCBlockSimple = SCBlockSimple
-  { command :: String
-  , args :: [String]
-  , delay :: Int
-  , output :: String
+  { meta    :: !BlockMeta
+  , command :: !String
+  , args    :: ![String]
+  , delay   :: !Int
+  , output  :: !String
   }
 
-systemCommandSimple :: String -> [String] -> Int -> SCBlockSimple
-systemCommandSimple c a d = SCBlockSimple
-  { command = c
+systemCommandSimple :: BlockMeta -> String -> [String] -> Int -> Block
+systemCommandSimple m c a d = Block $ SCBlockSimple
+  { meta = m
+  , command = c
   , args = a
   , delay = d
   , output = ""
   }
 
 instance IsBlock SCBlockSimple where
-  serialize b = pure defaultBlock { fullText = output b }
+  serialize b = [(serializationBase b){ i3bFullText = pack $ output b }]
   update b = do
     (_r, o, _e) <- readProcessWithExitCode (command b) (args b) ""
     return $ b{output = o}
   waitTime = delay
+  getMeta = Just . meta
 

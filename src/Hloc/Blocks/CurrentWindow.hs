@@ -1,37 +1,50 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Hloc.Blocks.CurrentWindow(currentWindow) where
 
-import Data.Maybe(fromMaybe)
+import Data.Text
 import qualified Graphics.X11.Xlib as X11
 import qualified Graphics.X11.Xlib.Extras as X11
 
 import Hloc.Block
 
+
 data CurrentWindow = CurrentWindow
-  { output :: String
-  , display :: X11.Display
-  , delay :: Int
+  { meta    :: !BlockMeta
+  , output  :: !(Maybe Text)
+  , display :: !X11.Display
+  , delay   :: !Int
   }
 
-currentWindow :: Int -> IO CurrentWindow
-currentWindow dl = do
+
+currentWindow :: BlockMeta -> Int -> IO Block
+currentWindow m dl = do
   d <- X11.openDisplay ""
   o <- getCurrentWindowName d
-  return CurrentWindow
-    { output = o
+  return $ Block $ CurrentWindow
+    { meta = m
+    , output = o
     , display = d
     , delay = dl
     }
 
 
-getCurrentWindowName :: X11.Display -> IO String
+getCurrentWindowName :: X11.Display -> IO (Maybe Text)
 getCurrentWindowName d = do
   (w, _) <- X11.getInputFocus d
-  fromMaybe "???" <$> X11.fetchName d w
+  a <- X11.internAtom d "_NET_WM_NAME" False
+  p <- X11.getTextProperty d w a
+  wname <- Prelude.concat <$> X11.wcTextPropertyToTextList d p
+  return $ case wname of
+    [] -> Nothing
+    _  -> Just (pack wname)
 
 
 instance IsBlock CurrentWindow where
   waitTime = delay
-  serialize b = pure defaultBlock { fullText = output b }
+  serialize b = case output b of
+    Just txt -> [(serializationBase b){ i3bFullText = txt }]
+    Nothing -> []
   update b = do
     o <- getCurrentWindowName (display b)
     return b{output = o}
+  getMeta = Just . meta

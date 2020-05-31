@@ -1,6 +1,5 @@
 module Hloc.Worker where
 
-import Control.Concurrent.QSem
 import Control.Concurrent
 import Control.Monad.Trans
 import Control.Monad
@@ -9,7 +8,7 @@ import Control.Monad
 import Hloc.Block
 
 data Worker = Worker
-  { hloc :: QSem
+  { hlocLock :: MVar ()
   , blockRef :: MVar Block
   }
 
@@ -20,5 +19,5 @@ loop :: Worker -> IO ()
 loop worker = forever $ do
   block <- takeMVar (blockRef worker) >>= update
   putMVar (blockRef worker) block
-  signalQSem (hloc worker)
+  void $ tryPutMVar (hlocLock worker) ()
   threadDelay (waitTime block)

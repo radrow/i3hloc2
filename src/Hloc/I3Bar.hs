@@ -1,99 +1,39 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Hloc.I3Bar where
 
-
+import Control.Lens
+import Control.Lens.Internal.FieldTH(_fieldToDef)
+import Language.Haskell.TH.Syntax(mkName, nameBase)
+import Hloc.Aeson
 import Data.Aeson
+import Data.Aeson.TH
+import Data.Text(Text)
 import System.Posix.Signals
 
 import Hloc.Color
 
-
 data I3BarHeader = I3BarHeader
-  { version :: Int
-  , stopSignal :: Signal
-  , contSignal :: Signal
-  , clickEvents :: Bool
+  { i3hVersion :: Int
+  , i3hStopSignal :: Int
+  , i3hContSignal :: Int
+  , i3hClickEvents :: Bool
   }
+
+deriveToJSON deriveOptions ''I3BarHeader
 
 -- |Default values of the header according to the protocol
 defaultHeader :: I3BarHeader
 defaultHeader = I3BarHeader
-  { version = 1
-  , stopSignal = sigSTOP
-  , contSignal = sigCONT
-  , clickEvents = True
-  }
-instance ToJSON I3BarHeader where
-  toJSON h = object
-    [ "version" .= version h
-    , "stop_signal" .= toInteger (stopSignal h)
-    , "cont_signal" .= toInteger (contSignal h)
-    , "click_events" .= clickEvents h
-    ]
-
-data I3BarBlock = I3BarBlock
-  { fullText :: String
-  , shortText :: Maybe String
-  , color :: Maybe Color
-  , background :: Maybe Color
-  , border :: Maybe Color
-  , borderBottom :: Int
-  , borderTop :: Int
-  , borderRight :: Int
-  , borderLeft :: Int
-  , minWidth :: Maybe Int
-  , align :: Align
-  , name :: Maybe String
-  , instance_ :: Maybe String
-  , urgent :: Bool
-  , separator :: Bool
-  , separatorBlockWidth :: Int
-  , markup :: Markup
+  { i3hVersion = 1
+  , i3hStopSignal = fromIntegral sigSTOP
+  , i3hContSignal = fromIntegral sigCONT
+  , i3hClickEvents = True
   }
 
-
--- | Default values of the block according to the protocol
-defaultBlock :: I3BarBlock
-defaultBlock = I3BarBlock
-  { fullText = ""
-  , shortText = Nothing
-  , color = Nothing
-  , background = Nothing
-  , border = Nothing
-  , borderBottom = 1
-  , borderTop = 1
-  , borderRight = 1
-  , borderLeft = 1
-  , minWidth = Nothing
-  , align = AlignLeft
-  , name = Nothing
-  , instance_ = Nothing
-  , urgent = False
-  , separator = True
-  , separatorBlockWidth = 9
-  , markup = NoMarkup
-  }
-instance ToJSON I3BarBlock where
-  toJSON b = object -- FIXME are nulls equivalent to no value?
-    [ "full_text" .= fullText b
-    , "short_text" .= shortText b
-    , "color" .= color b
-    , "background" .= background b
-    , "border" .= border b
-    , "border_bottom" .= borderBottom b
-    , "border_top" .= borderTop b
-    , "border_right" .= borderRight b
-    , "border_left" .= borderLeft b
-    , "min_width" .= minWidth b
-    , "align" .= align b
-    , "name" .= name b
-    , "instance" .= instance_ b
-    , "urgent" .= urgent b
-    , "separator" .= separator b
-    , "separator_block_width" .= separatorBlockWidth b
-    , "markup" .= markup b
-    ]
 
 data Align = AlignCenter | AlignLeft | AlignRight
 instance ToJSON Align where
@@ -106,27 +46,68 @@ instance ToJSON Markup where
   toJSON Pango = "pango"
   toJSON NoMarkup = "none"
 
-
-data ClickEvent = ClickEvent
-  { blockName :: String
-  , blockInstance :: String
-  , fixedX :: Int
-  , fixedY :: Int
-  , relativeX :: Int
-  , relativeY :: Int
-  , blockWidth :: Int
-  , blockHeight :: Int
-  , modifiers :: [String]
+data I3BarBlock = I3BarBlock
+  { i3bFullText :: Text
+  , i3bShortText :: Maybe Text
+  , i3bColor :: Maybe Color
+  , i3bBackground :: Maybe Color
+  , i3bBorder :: Maybe Color
+  , i3bBorderBottom :: Int
+  , i3bBorderTop :: Int
+  , i3bBorderRight :: Int
+  , i3bBorderLeft :: Int
+  , i3bMinWidth :: Maybe Int
+  , i3bAlign :: Align
+  , i3bName :: Maybe Text
+  , i3bInstance :: Maybe Text
+  , i3bUrgent :: Bool
+  , i3bSeparator :: Bool
+  , i3bSeparatorBlockWidth :: Int
+  , i3bMarkup :: Markup
   }
 
-instance FromJSON ClickEvent where
-  parseJSON (Object v) = ClickEvent
-    <$> v .: "name"
-    <*> v .: "instance"
-    <*> v .: "x"
-    <*> v .: "y"
-    <*> v .: "relative_x"
-    <*> v .: "relative_y"
-    <*> v .: "width"
-    <*> v .: "height"
-    <*> v .: "modifiers"
+deriveToJSON deriveOptions ''I3BarBlock
+makeLensesWith defaultFieldRules
+  { _fieldToDef = \c fields field -> abbreviatedNamer c fields $
+                                     case nameBase field of
+                                       "i3bInstance" -> mkName "i3bInstanceName"
+                                       _ -> field
+      } ''I3BarBlock
+
+-- | Default values of the block according to the protocol
+defaultBlock :: I3BarBlock
+defaultBlock = I3BarBlock
+  { i3bFullText = ""
+  , i3bShortText = Nothing
+  , i3bColor = Nothing
+  , i3bBackground = Nothing
+  , i3bBorder = Nothing
+  , i3bBorderBottom = 1
+  , i3bBorderTop = 1
+  , i3bBorderRight = 1
+  , i3bBorderLeft = 1
+  , i3bMinWidth = Nothing
+  , i3bAlign = AlignLeft
+  , i3bName = Nothing
+  , i3bInstance = Nothing
+  , i3bUrgent = False
+  , i3bSeparator = True
+  , i3bSeparatorBlockWidth = 9
+  , i3bMarkup = NoMarkup
+  }
+
+
+data ClickEvent = ClickEvent
+  { ceName :: Text
+  , ceInstance :: Text
+  , ceX :: Int
+  , ceY :: Int
+  , ceRelativeX :: Int
+  , ceRelativeY :: Int
+  , ceWidth :: Int
+  , ceHeight :: Int
+  , ceModifiers :: [Text]
+  }
+
+deriveFromJSON deriveOptions ''ClickEvent
+

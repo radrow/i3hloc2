@@ -1,12 +1,22 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Hloc.Blocks.Network
   ( network
   , networkDefault
-  , NetworkEntity(..)
+  , NetworkFormat( UpSpeed
+                 , DownSpeed
+                 , Status
+                 , StatusNoUp
+                 , IP
+                 )
   , DataUnit(..)
   ) where
 
+import Data.Maybe(fromMaybe)
+import Data.Text(Text)
+import qualified Data.Text as T
+import Text.Read(readMaybe)
+import Data.String
 import Data.Functor((<&>))
-import Data.List(intersperse)
 import System.FilePath
 import System.Directory
 import System.Clock
@@ -14,13 +24,17 @@ import System.Clock
 import Hloc.Block
 
 
-data NetworkEntity
-  = PlainText String
+data NetworkFormat
+  = Text !Text
+  | Interface
   | UpSpeed
   | DownSpeed
   | Status
   | StatusNoUp
   | IP
+
+instance IsString NetworkFormat where
+  fromString = Text . T.pack
 
 data DataUnit
   = Bytes
@@ -47,28 +61,37 @@ data SpeedStats = SpeedStats
   }
 
 data Network = Network
-  { format        :: [NetworkEntity]
-  , dataUnit      :: DataUnit
-  , displayUnit   :: Bool
-  , delay         :: Int
-  , lastUpdate    :: TimeSpec
+  { meta          :: !BlockMeta
+  , format        :: ![NetworkFormat]
+  , dataUnit      :: !DataUnit
+  , displayUnit   :: !Bool
+  , delay         :: !Int
+  , lastUpdate    :: !TimeSpec
   , transferStats :: Maybe TransferStats
   , speedStats    :: Maybe SpeedStats
   , state         :: State
-  , interface     :: String
-  , interfaceDir  :: String
+  , interface     :: !FilePath
+  , interfaceDir  :: !FilePath
   }
 
-network :: Int -> String -> FilePath -> DataUnit -> Bool -> [NetworkEntity] -> IO Network
-network d i cp du disp f = do
+network :: BlockMeta
+        -> Int
+        -> String
+        -> FilePath
+        -> DataUnit
+        -> Bool
+        -> [NetworkFormat]
+        -> IO Block
+network m d i cp du disp f = do
   timeNow <- getTime Realtime
   let path = cp </> i
   s <- getState path
   transfer <- case s of
     Up -> fmap Just $ TransferStats <$> getUp path <*> getDown path
     _ -> return Nothing
-  return Network
-    { format = f
+  return $ Block $ Network
+    { meta = m
+    , format = f
     , dataUnit = du
     , displayUnit = disp
     , delay = d
@@ -80,16 +103,17 @@ network d i cp du disp f = do
     , interfaceDir = path
     }
 
-networkDefault :: String -> IO Network
-networkDefault int =
-  network 1000000 int "/sys/class/net/" AutoBin True [Status, DownSpeed, UpSpeed]
+networkDefault :: BlockMeta -> String -> IO Block
+networkDefault m int =
+  network m 1000000 int "/sys/class/net/" AutoBin True
+  [Interface, Status, DownSpeed, UpSpeed]
 
 getState :: FilePath -> IO State
 getState path = do
   let file = path </> "operstate"
   exists <- doesFileExist file
   if exists
-    then filter (/= '\n') <$> readFile file <&> \case
+    then T.strip . T.pack <$> readFile file <&> \case
     "up" -> Up
     "down" -> Down
     "dormant" -> Dormant
@@ -100,13 +124,13 @@ getState path = do
 getUp :: FilePath -> IO Int
 getUp path = do
   let file = path </> "statistics" </> "tx_bytes"
-  readFile file <&> read
+  readFile file <&> fromMaybe 0 . readMaybe
 
 
 getDown :: FilePath -> IO Int
 getDown path = do
   let file = path </> "statistics" </> "rx_bytes"
-  readFile file <&> read
+  readFile file <&> fromMaybe 0 . readMaybe
 
 instance IsBlock Network where
   waitTime = delay
@@ -114,20 +138,23 @@ instance IsBlock Network where
     let s = state b
         unit = dataUnit b
         dispUnit = displayUnit b
-        out = unwords $ map printEntity (format b) where
-          printEntity = \case
-            PlainText str -> str
+        out :: Text
+        out = T.unwords $ map printFormat (format b) where
+          printFormat = \case
+            Text str -> str
             UpSpeed ->
               let ms = showInUnit unit dispUnit . lastUpSpeed <$> speedStats b
-              in maybe "" (++"↑")ms
+              in maybe "" (<>"↑") ms
             DownSpeed ->
               let ms = showInUnit unit dispUnit . lastDownSpeed <$> speedStats b
-              in maybe "" (++"↓") ms
+              in maybe "" (<>"↓") ms
             Status -> showState s
             StatusNoUp -> case s of
               Up -> ""
               _ -> showState s
-    in pure defaultBlock {fullText = out}
+            Interface ->
+              T.pack $ interface b
+    in [(serializationBase b){i3bFullText = out}]
   update b = do
     let path = interfaceDir b
     s <- getState path
@@ -167,11 +194,12 @@ instance IsBlock Network where
         , speedStats = Nothing
         , lastUpdate = timeNow
         }
+  getMeta = Just . meta
 
-showInUnit :: DataUnit -> Bool -> Int -> String
+showInUnit :: DataUnit -> Bool -> Int -> Text
 showInUnit unit dispUnit val =
-  let optShow :: Int -> String -> String
-      optShow v s = show v ++ if dispUnit then ' ':s else ""
+  let optShow :: Int -> Text -> Text
+      optShow v s = T.concat [T.pack $ show v, if dispUnit then " "<>s else ""]
       showInUnit' u = case u of
         Bytes -> optShow val "B"
         KiloBytes -> optShow (val `quot` 1000) "kB"
@@ -196,7 +224,7 @@ showInUnit unit dispUnit val =
           | otherwise -> showInUnit' PebiBytes
   in showInUnit' unit
 
-showState :: State -> String
+showState :: State -> Text
 showState = \case
   Up -> "up"
   Down -> "down"

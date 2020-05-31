@@ -1,13 +1,19 @@
 module Hloc.Blocks.Constant(constant) where
 
+import Data.Text
+import Data.String
 import Hloc.Block
 
-newtype Constant = Constant String
+data Constant = Constant
+  { meta :: !BlockMeta
+  , content :: !Text
+  }
 
-constant :: String -> Constant
-constant = Constant
+constant :: BlockMeta -> Text -> Block
+constant m t = Block $ Constant m t
 
 instance IsBlock Constant where
-  serialize (Constant s) = pure defaultBlock { fullText = s }
+  serialize b = [(serializationBase b){ i3bFullText = content b }]
   update = pure
   waitTime _ = maxBound
+  getMeta = Just . meta

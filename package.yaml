@@ -33,6 +33,10 @@ library:
   dependencies:
     - mtl
     - aeson
+    - aeson-casing
+    - lens
+    - template-haskell
+    - containers
     - text
     - bytestring
     - time
@@ -42,6 +46,7 @@ library:
     - unix
     - directory
     - alsa-mixer
+    - random
 
 executables:
   i3hloc:
@@ -52,6 +57,7 @@ executables:
       - -rtsopts
       - -with-rtsopts=-N
       - -O2
+      - -optc-O3
       - -Wall
       - -Wmissed-specialisations
       - -Wall-missed-specialisations

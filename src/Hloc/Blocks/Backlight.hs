@@ -1,7 +1,9 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Hloc.Blocks.Backlight
   ( backlight, backlightDefault
   ) where
 
+import           Data.Text
 import           Control.Applicative
 import           System.Clock
 import           System.FilePath
@@ -13,32 +15,34 @@ import           Hloc.Block
 
 
 data Backlight = Backlight
-  { delay        :: Int
-  , lastChange   :: TimeSpec
-  , boostTime    :: TimeSpec
-  , boost        :: Bool
-  , backlightDir :: FilePath
-  , output       :: Maybe Int
+  { meta         :: !BlockMeta
+  , delay        :: !Int
+  , lastChange   :: !TimeSpec
+  , boostTime    :: !TimeSpec
+  , boost        :: !Bool
+  , backlightDir :: !FilePath
+  , output       :: !(Maybe Int)
   }
 
-backlight :: Int -> FilePath -> Backlight
-backlight d bd = Backlight
-  { delay = d
+backlight :: BlockMeta -> Int -> FilePath -> Block
+backlight m d bd = Block $ Backlight
+  { meta = m
+  , delay = d
   , lastChange = TimeSpec {sec = 0, nsec = 0}
-  , boostTime = TimeSpec {sec = 1, nsec = 0}
+  , boostTime = TimeSpec {sec = 2, nsec = 0}
   , boost = False
   , backlightDir = bd
   , output = Nothing
   }
 
-backlightDefault :: Backlight
-backlightDefault = backlight 200000 "/sys/class/backlight/intel_backlight"
+backlightDefault :: BlockMeta -> Block
+backlightDefault m = backlight m 1000000 "/sys/class/backlight/intel_backlight"
 
 instance IsBlock Backlight where
   waitTime b = if boost b then delay b `div` 10 else delay b
-  serialize b = pure defaultBlock
-    { fullText = maybe "" show (output b)
-    }
+  serialize b = [(serializationBase b)
+    { i3bFullText = maybe "" (pack . show) (output b)
+    }]
   update b = do
     let brightnessFile = backlightDir b </> "brightness"
     let maxBrightnessFile = backlightDir b </> "max_brightness"
