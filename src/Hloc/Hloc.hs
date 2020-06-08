@@ -2,7 +2,6 @@
 module Hloc.Hloc where
 
 import           Control.Concurrent
-import           Control.Lens
 import           Control.Monad.State
 import qualified Data.Map as M
 import           Data.Text(Text)
@@ -11,7 +10,6 @@ import qualified Data.ByteString.Lazy.Char8 as BS
 import           System.IO
 
 import           Hloc.Block
-import           Hloc.Color
 import           Hloc.I3Bar
 import           Hloc.Worker
 
@@ -31,8 +29,8 @@ createWorker block = do
   me <- gets semaphore
   blockMV <- liftIO $ newMVar block
   let worker = Worker
-        { hlocLock = me
-        , blockRef = blockMV
+        { hlocLock   = me
+        , blockRef   = blockMV
         }
   threadId <- runWorker worker
   modify (\s -> s{workers = (threadId, blockMV):workers s})

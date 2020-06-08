@@ -15,18 +15,20 @@ import Hloc.Blocks.Battery as Bat
 run :: IO ()
 run = do
   let m = defaultMeta
-  date <- dateBlock m{bmColor = Just $ light green} [Day, "-", Month, "-", Year]
-  time <- dateBlock m{bmColor = Just $ light red} [Hour24, ":", Minute, ":", Sec]
+  date <- dateBlock m{bmColor = Just coral} ["\xf073 ", Day, "-", Month, "-", Year]
+  time <- dateBlock m{bmColor = Just pink} ["\xf017 ", Hour24, ":", Minute, ":", Sec]
   cw <- currentWindow m 1000000
-  net <- networkDefault m{bmColor = Just green} "wlo1"
-  bat <- batteryDefault m "BAT0" [Bat.Status, Health, Charge, ETA]
+  let netConf = networkDefaultConfig m{bmColor = Just lime} "wlo1"
+  net <- network netConf{ncFormat = "\xf1eb": ncFormat netConf}
+  bat <- batteryDefault m "BAT0"
+    [Bat.Status True, Health, Charge True, Charge False, ETA]
   runHloc defaultHeader
     [ time
     , date
     , cw
-    , backlightDefault m{bmColor = Just (RGB 230 230 20)}
-    , volumeDefault m{bmColor = Just (RGB 230 20 230)}
+    , backlightDefault m{bmColor = Just white}
     , net
+    , volumeDefault m{bmColor = Just yellow}
     , bat
     ]
 

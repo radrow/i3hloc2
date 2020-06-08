@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Hloc.Blocks.Network
   ( network
-  , networkDefault
+  , networkDefaultConfig
+  , NetworkConfig(..)
   , NetworkFormat( UpSpeed
                  , DownSpeed
                  , Status
@@ -74,15 +75,39 @@ data Network = Network
   , interfaceDir  :: !FilePath
   }
 
-network :: BlockMeta
-        -> Int
-        -> String
-        -> FilePath
-        -> DataUnit
-        -> Bool
-        -> [NetworkFormat]
-        -> IO Block
-network m d i cp du disp f = do
+data NetworkConfig = NetworkConfig
+  { ncMeta          :: !BlockMeta
+  , ncFormat        :: ![NetworkFormat]
+  , ncDataUnit      :: !DataUnit
+  , ncDisplayUnit   :: !Bool
+  , ncDelay         :: !Int
+  , ncInterface     :: !FilePath
+  , ncInterfaceDir  :: !FilePath
+  }
+
+
+networkDefaultConfig :: BlockMeta -> String -> NetworkConfig
+networkDefaultConfig m int = NetworkConfig
+  { ncMeta = m
+  , ncInterface = int
+  , ncFormat = [Interface, Status, DownSpeed, UpSpeed]
+  , ncDataUnit = AutoBin
+  , ncDisplayUnit = True
+  , ncDelay = 1000000
+  , ncInterfaceDir = "/sys/class/net/"
+  }
+
+
+network :: NetworkConfig -> IO Block
+network NetworkConfig
+  { ncMeta = m
+  , ncInterface = i
+  , ncFormat = f
+  , ncDataUnit = du
+  , ncDisplayUnit = disp
+  , ncDelay = d
+  , ncInterfaceDir = cp
+  } = do
   timeNow <- getTime Realtime
   let path = cp </> i
   s <- getState path
@@ -102,11 +127,6 @@ network m d i cp du disp f = do
     , interface = i
     , interfaceDir = path
     }
-
-networkDefault :: BlockMeta -> String -> IO Block
-networkDefault m int =
-  network m 1000000 int "/sys/class/net/" AutoBin True
-  [Interface, Status, DownSpeed, UpSpeed]
 
 getState :: FilePath -> IO State
 getState path = do

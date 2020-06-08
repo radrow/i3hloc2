@@ -20,6 +20,8 @@ import           System.Directory
 import           System.FilePath
 
 import           Hloc.Block
+import           Hloc.Color
+
 
 data Health
   = HealthUnknown
@@ -63,9 +65,9 @@ data BatteryInfo = BatteryInfo
 
 data BatteryFormat
   = Text !Text
-  | Status
+  | Status !Bool
   | Health
-  | Charge
+  | Charge !Bool
   | ETA
 
 instance IsString BatteryFormat where
@@ -173,12 +175,23 @@ instance IsBlock Battery where
     let out = T.unwords $ map printFormat (format b) where
           printFormat = \case
             Text str -> str
-            Status -> showStatus b
+            Status useIcon ->
+              if useIcon
+              then statusIcon b
+              else showStatus b
             Health -> showHealth b
-            Charge -> showCapacity b
+            Charge useIcon ->
+              if useIcon
+              then fromMaybe "" $ capacityIcon b
+              else showCapacity b
             ETA -> showEta b
         cap = fromMaybe 100 (getCapacity b)
-    in [(serializationBase b){i3bFullText = out, i3bUrgent = cap < 10}]
+    in [(serializationBase b)
+         { i3bFullText = out
+         , i3bUrgent = cap < 10
+         , i3bColor = capacityColor b
+         }
+       ]
   update = updateBatteryInfo
 
 microsecToTimeSpec :: Int -> TimeSpec
@@ -269,3 +282,55 @@ twoDigitFront t = case T.length t of
   0 -> "00"
   1 -> "1" <> t
   _ -> t
+
+
+iconBatFull :: Text
+iconBatFull = "\xf240"
+
+iconBat75 :: Text
+iconBat75 = "\xf241"
+
+iconBat50 :: Text
+iconBat50 = "\xf242"
+
+iconBat25 :: Text
+iconBat25 = "\xf243"
+
+iconBatEmpty :: Text
+iconBatEmpty = "\xf244"
+
+capacityIcon :: Battery -> Maybe Text
+capacityIcon bat =
+  getCapacity bat <&>
+    \cap ->
+      if | cap >= 85 -> iconBatFull
+         | cap >= 60 -> iconBat75
+         | cap >= 35 -> iconBat50
+         | cap >= 10 -> iconBat25
+         | otherwise -> iconBatEmpty
+
+capacityColor :: Battery -> Maybe Color
+capacityColor bat =
+  getCapacity bat <&>
+    \cap -> RGB
+            (fromIntegral $ (100 - cap) * 255 `div` 100)
+            (fromIntegral $ cap * 255 `div` 100)
+            0
+
+iconPlug :: Text
+iconPlug = "\xf1e6"
+
+iconX :: Text
+iconX = "\xf057"
+
+iconBolt :: Text
+iconBolt = "\xf0e7"
+
+statusIcon :: Battery -> Text
+statusIcon Battery{status = s} = case s of
+  StatusUnknown -> ""
+  Charging      -> iconBolt
+  Discharging   -> ""
+  NotCharging   -> ""
+  Full          -> iconPlug
+  Missing       -> iconX

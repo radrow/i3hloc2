@@ -10,7 +10,7 @@ import Hloc.Block
 data Volume = Volume
   { meta         :: !BlockMeta
   , output       :: !Text
-  , format       :: !Format
+  , format       :: ![Format]
   , controlName  :: !String
   , mixerName    :: !String
   , delay        :: !Int
@@ -23,8 +23,9 @@ data Format
   = Level
   | Mute
   | MuteAndLevel
+  | Icon
 
-volume :: BlockMeta -> Int -> Format -> String -> String -> Block
+volume :: BlockMeta -> Int -> [Format] -> String -> String -> Block
 volume m d f mx con = Block $ Volume
   { meta = m
   , output = ""
@@ -38,7 +39,7 @@ volume m d f mx con = Block $ Volume
   }
 
 volumeDefault :: BlockMeta -> Block
-volumeDefault m = volume m 1000000 MuteAndLevel "default" "Master"
+volumeDefault m = volume m 1000000 [Icon, Level] "default" "Master"
 
 wtfStr :: Text
 wtfStr = "??"
@@ -64,7 +65,7 @@ getVolumeMute control =
   case ALSA.playback (ALSA.switch control) of
     Nothing -> return Nothing
     Just switchPlayback ->
-        ALSA.getChannel ALSA.FrontLeft switchPlayback
+        fmap not <$> ALSA.getChannel ALSA.FrontLeft switchPlayback
 
 
 instance IsBlock Volume where
@@ -74,21 +75,40 @@ instance IsBlock Volume where
       controlM <- ALSA.getControlByName mixer (controlName b)
       case controlM of
         Nothing -> return wtfStr
-        Just control -> case format b of
-          Mute -> do
-            mute <- getVolumeMute control
-            return $ maybe wtfStr (\m -> if m then "off" else "on") mute
-          Level -> do
-            lvl <- getVolumePercent control
-            return $ maybe wtfStr
-              (twoDigitFront . pack . show) lvl
-          MuteAndLevel -> do
-            mute <- getVolumeMute control
-            lvl <- getVolumePercent control
-            case (mute, lvl) of
-              (Just m, Just l) ->
-                return $ if m then (twoDigitFront . pack . show) l else "off"
-              _ -> return wtfStr
+        Just control ->
+          let showFormat = \case
+                Icon -> do
+                  mute <- getVolumeMute control
+                  case mute of
+                    Just True -> return iconMute
+                    _ -> do
+                      lvl <- getVolumePercent control
+                      return $ case lvl of
+                        Nothing -> wtfStr
+                        Just n -> if | n > 50 -> icon2
+                                     | n > 10 -> icon1
+                                     | otherwise -> icon0
+                Mute -> do
+                  mute <- getVolumeMute control
+                  return $ maybe wtfStr
+                    (\m -> if m
+                           then "off"
+                           else "on"
+                    ) mute
+                Level -> do
+                  lvl <- getVolumePercent control
+                  return $ maybe wtfStr
+                    (twoDigitFront . pack . show) lvl
+                MuteAndLevel -> do
+                  mute <- getVolumeMute control
+                  lvl <- getVolumePercent control
+                  case (mute, lvl) of
+                    (Just m, Just l) ->
+                      return $ if m
+                               then "off"
+                               else (twoDigitFront . pack . show) l
+                    _ -> return wtfStr
+          in T.concat <$> mapM showFormat (format b)
     timeNow <- getTime Realtime
 
     return b
@@ -101,3 +121,19 @@ instance IsBlock Volume where
       }
   waitTime b = if boost b then delay b `div` 10 else delay b
   getMeta = Just . meta
+
+
+iconX :: Text
+iconX = "\xf00d"
+
+iconMute :: Text
+iconMute = icon0 <> iconX
+
+icon0 :: Text
+icon0 = "\xf026"
+
+icon1 :: Text
+icon1 = "\xf027"
+
+icon2 :: Text
+icon2 = "\xf028"

@@ -9,13 +9,14 @@ module Hloc.Block
   , defaultMeta
   ) where
 
+import Data.Typeable
 import Data.Text
 
 import Hloc.Color
 import Hloc.I3Bar (I3BarBlock(..), Align(..), defaultBlock)
 
 
-class IsBlock b where
+class Typeable b => IsBlock b where
   serialize :: b -> [I3BarBlock]
   update :: b -> IO b
   waitTime :: b -> Int
