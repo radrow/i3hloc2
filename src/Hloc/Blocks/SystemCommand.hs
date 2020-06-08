@@ -22,7 +22,8 @@ systemCommandSimple m c a d = Block $ SCBlockSimple
   }
 
 instance IsBlock SCBlockSimple where
-  serialize b = [(serializationBase b){ i3bFullText = pack $ output b }]
+  serialize b = [(serializationBase b)
+                  { i3bFullText = pack $ Prelude.takeWhile (/= '\n') (output b) }]
   update b = do
     (_r, o, _e) <- readProcessWithExitCode (command b) (args b) ""
     return $ b{output = o}

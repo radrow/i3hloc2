@@ -2,6 +2,7 @@
 module Hloc.Blocks.Volume(volumeDefault, volume) where
 
 import Data.Text as T
+import Data.List as DL
 import System.Clock
 import qualified Sound.ALSA.Mixer as ALSA
 
@@ -108,7 +109,7 @@ instance IsBlock Volume where
                                then "off"
                                else (twoDigitFront . pack . show) l
                     _ -> return wtfStr
-          in T.concat <$> mapM showFormat (format b)
+          in T.concat . DL.intersperse " " <$> mapM showFormat (format b)
     timeNow <- getTime Realtime
 
     return b
