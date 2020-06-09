@@ -5,16 +5,17 @@ module Hloc.Worker where
 import Control.Concurrent
 import Control.Exception
 import Control.Monad.Trans
-import Control.Monad
+import Control.Monad.State.Strict
 import Data.Text(Text)
 import Data.Typeable
+import Data.Aeson as Aeson
 
 import Hloc.Block
 import Hloc.I3Bar
 
 data Worker = Worker
   { hlocLock   :: MVar ()
-  , blockRef   :: MVar Block
+  , jsonsRef   :: MVar [Aeson.Value]
   }
 
 newtype CrashedBlock = CrashedBlock { uncrashBlock :: Block }
@@ -42,14 +43,17 @@ crashed bAny@(Block b) = case cast b :: Maybe CrashedBlock of
   Just cb -> Block cb
   Nothing -> Block $ CrashedBlock bAny
 
-runWorker :: MonadIO m => Worker -> m ThreadId
-runWorker worker = liftIO $ forkIO $ loop worker
+runWorker :: MonadIO m => Worker -> Block -> m ThreadId
+runWorker worker block = liftIO $ forkIO $ evalStateT (loop worker) block
 
-loop :: Worker -> IO ()
+loop :: Worker -> StateT Block IO ()
 loop worker = forever $ do
-  prevBlock <- takeMVar (blockRef worker)
-  block <- update prevBlock `catch` \(_ :: SomeException) ->
-           return (crashed prevBlock)
-  putMVar (blockRef worker) block
-  void $ tryPutMVar (hlocLock worker) ()
-  threadDelay (waitTime block)
+  prevBlock <- get
+  block <- liftIO $ do
+    block <- modifyMVar (jsonsRef worker) $ \_ -> do
+      block <- update prevBlock `catch` \(_ :: SomeException) -> return (crashed prevBlock)
+      return (map toJSON $ serialize block, block)
+    void $ tryPutMVar (hlocLock worker) ()
+    threadDelay (waitTime block)
+    return block
+  put block

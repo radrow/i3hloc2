@@ -3,9 +3,7 @@ module Hloc.Hloc where
 
 import           Control.Concurrent
 import           Control.Monad.State
-import qualified Data.Map as M
-import           Data.Text(Text)
-import           Data.Aeson
+import           Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy.Char8 as BS
 import           System.IO
 
@@ -13,13 +11,10 @@ import           Hloc.Block
 import           Hloc.I3Bar
 import           Hloc.Worker
 
-type PostProcess = M.Map Text (
-  Maybe Text, I3BarBlock -> I3BarBlock)
 
 data Hloc = Hloc
   { semaphore   :: MVar ()
-  , workers     :: [(ThreadId, MVar Block)]
-  , postProcess :: PostProcess
+  , workers     :: [(ThreadId, MVar [Aeson.Value])]
   }
 
 type HlocM = StateT Hloc IO
@@ -27,13 +22,13 @@ type HlocM = StateT Hloc IO
 createWorker :: Block -> HlocM ()
 createWorker block = do
   me <- gets semaphore
-  blockMV <- liftIO $ newMVar block
+  jsonsMV <- liftIO $ newMVar []
   let worker = Worker
         { hlocLock   = me
-        , blockRef   = blockMV
+        , jsonsRef   = jsonsMV
         }
-  threadId <- runWorker worker
-  modify (\s -> s{workers = (threadId, blockMV):workers s})
+  threadId <- runWorker worker block
+  modify (\s -> s{workers = (threadId, jsonsMV):workers s})
 
 
 runHloc :: I3BarHeader -> [Block] -> IO ()
@@ -42,7 +37,6 @@ runHloc header inits = do
   let initState = Hloc
         { semaphore = s
         , workers = []
-        , postProcess = M.empty
         }
   flip evalStateT initState $ do
     forM_ inits createWorker
@@ -55,27 +49,15 @@ runHloc header inits = do
 loopHloc :: HlocM ()
 loopHloc = forever $ do
   ws <- gets workers
-  blocks <- forM ws $ \(_, block) ->
+  blocks <- fmap concat $ forM ws $ \(_, block) ->
     liftIO . readMVar $ block
-  pp <- gets postProcess
-  printBlocks pp blocks
+  printBlocks blocks
   s <- gets semaphore
   liftIO $ takeMVar s
 
-printBlocks :: PostProcess -> [Block] -> HlocM ()
-printBlocks pp blocks = do
-  let jsons = concatMap (map (applyPostProcess pp) . serialize) blocks
-      encoded = encode $ toJSON jsons
+printBlocks :: [Aeson.Value] -> HlocM ()
+printBlocks blocks = do
+  let encoded = encode $ toJSON blocks
   liftIO $ do
     BS.putStrLn $ encoded <> BS.pack ","
     hFlush stdout
-
-applyPostProcess :: PostProcess -> I3BarBlock -> I3BarBlock
-applyPostProcess pp b =
-  case i3bName b of
-    Nothing -> case M.lookup "" pp of
-      Nothing -> b
-      Just (_, f) -> f b
-    Just n -> case M.lookup n pp of
-      Nothing -> b
-      Just (_, f) -> f b

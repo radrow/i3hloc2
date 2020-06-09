@@ -312,10 +312,10 @@ capacityIcon bat =
 capacityColor :: Battery -> Maybe Color
 capacityColor bat =
   getCapacity bat <&>
-    \cap -> RGB
-            (fromIntegral $ (100 - cap) * 255 `div` 100)
-            (fromIntegral $ cap * 255 `div` 100)
-            0
+    \cap -> if
+      | cap > 50 -> RGB (fromIntegral $ (100 - cap) * 255 `div` 100) 255 0
+      | cap < 50 -> RGB 255 (fromIntegral $ cap * 255 `div` 100) 0
+      | otherwise -> RGB 255 255 0
 
 iconPlug :: Text
 iconPlug = "\xf1e6"
