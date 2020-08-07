@@ -88,7 +88,7 @@ battery m del edel n f = do
     }
 
 batteryDefault :: BlockMeta -> String -> [BatteryFormat] -> IO Block
-batteryDefault m = battery m 10000000 1200000000
+batteryDefault m = battery m 10000000 120000000
 
 updateBatteryInfo :: Battery -> IO Battery
 updateBatteryInfo b = do
@@ -211,7 +211,6 @@ getEta Battery{batInfo = Just bi, status = st} =
             timeDelta :: Int
             timeDelta = fromInteger (toNanoSecs lastT - toNanoSecs firstT) `quot` 1000
         in
-          -- trace ("cd: " <> show chrDelta <> ", td: " <> show timeDelta <> ", chr: " <> show (charge bi)) $
            if chrDelta == 0
            then Nothing
            else Just $ timeDelta * charge bi `div` chrDelta
@@ -247,7 +246,7 @@ showHealth Battery{batInfo = Just BatteryInfo{health = h}} = case h of
   Cold                -> "cold"
   WatchdogTimerExpire -> "watchdog expire"
   SafetyTimerExpire   -> "safety time expire"
-  OverCurrent         -> "over-c"
+  OverCurrent         -> "over current"
 showHealth _ = ""
 
 getCapacity :: Battery -> Maybe Int
@@ -280,7 +279,7 @@ showEta b = case getEta b of
 twoDigitFront :: Text -> Text
 twoDigitFront t = case T.length t of
   0 -> "00"
-  1 -> "1" <> t
+  1 -> "0" <> t
   _ -> t
 
 
