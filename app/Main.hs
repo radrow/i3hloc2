@@ -1,6 +1,7 @@
-module Main where
+module Main(main) where
 
-import Hloc.Example
+import Hloc.Example(run)
+import System.IO(stderr, hPutStrLn)
 
 main :: IO ()
-main = run
+main = run >> hPutStrLn stderr "good night"

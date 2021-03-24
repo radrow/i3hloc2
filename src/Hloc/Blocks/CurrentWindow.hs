@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Hloc.Blocks.CurrentWindow(currentWindow) where
 
+import Control.Exception
 import Data.Text
 import qualified Graphics.X11.Xlib as X11
 import qualified Graphics.X11.Xlib.Extras as X11
@@ -32,8 +34,9 @@ getCurrentWindowName :: X11.Display -> IO (Maybe Text)
 getCurrentWindowName d = do
   (w, _) <- X11.getInputFocus d
   a <- X11.internAtom d "_NET_WM_NAME" False
-  p <- X11.getTextProperty d w a
-  wname <- Prelude.concat <$> X11.wcTextPropertyToTextList d p
+  wname <- handle (\(_ :: SomeException) -> return "") $ do
+    p <- X11.getTextProperty d w a
+    Prelude.concat <$> X11.wcTextPropertyToTextList d p
   return $ case wname of
     [] -> Nothing
     _  -> Just (pack wname)

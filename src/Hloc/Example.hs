@@ -32,7 +32,7 @@ run = do
     [ time
     , date
     , backlightDefault m{bmColor = Just white}
-    , volumeDefault m{bmColor = Just yellow}
+--    , volumeDefault m{bmColor = Just yellow}
     , net
     , systemCommandSimple m{bmColor = Just red} "hostname" ["-i"] 100000000
     , bat

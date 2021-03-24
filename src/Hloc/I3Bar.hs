@@ -72,7 +72,7 @@ makeLensesWith defaultFieldRules
                                      case nameBase field of
                                        "i3bInstance" -> mkName "i3bInstanceName"
                                        _ -> field
-      } ''I3BarBlock
+  } ''I3BarBlock
 
 -- | Default values of the block according to the protocol
 defaultBlock :: I3BarBlock

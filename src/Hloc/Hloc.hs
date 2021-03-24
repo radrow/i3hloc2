@@ -42,7 +42,7 @@ runHloc header inits = do
     forM_ inits createWorker
     liftIO $ do
       BS.putStrLn $ encode (toJSON header)
-      BS.putStrLn $ BS.pack "["
+      BS.putStrLn "["
       hFlush stdout
     loopHloc
 
