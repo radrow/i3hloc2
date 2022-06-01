@@ -9,6 +9,7 @@ import Control.Monad.State.Strict
 import Data.Text(Text)
 import Data.Typeable
 import Data.Aeson as Aeson
+import System.Timeout
 
 import Hloc.Block
 import Hloc.I3Bar
@@ -51,7 +52,10 @@ loop worker = forever $ do
   prevBlock <- get
   block <- liftIO $ do
     block <- modifyMVar (jsonsRef worker) $ \_ -> do
-      block <- update prevBlock `catch` \(_ :: SomeException) -> return (crashed prevBlock)
+      mblock <- timeout 3000000 $ update prevBlock `catch` \(_ :: SomeException) -> return (crashed prevBlock)
+      let block = case mblock of
+            Just b -> b
+            Nothing -> prevBlock
       return (map toJSON $ serialize block, block)
     void $ tryPutMVar (hlocLock worker) ()
     threadDelay (waitTime block)

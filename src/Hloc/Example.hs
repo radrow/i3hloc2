@@ -17,7 +17,7 @@ run :: IO ()
 run = do
   let m = defaultMeta
   date <- dateBlock m{bmColor = Just paleTurquoise}
-          ["\xf073 ", Day, "-", Month, "-", Year]
+          ["\xf073 ", WeekDayShort, " ", Day, "-", Month, "-", Year]
   time <- dateBlock m{bmColor = Just pink}
           ["\xf017 ", Hour24, ":", Minute, ":", Sec]
   cw <- currentWindow m{bmBorderBottom = 1} 1000000
@@ -32,7 +32,7 @@ run = do
     [ time
     , date
     , backlightDefault m{bmColor = Just white}
---    , volumeDefault m{bmColor = Just yellow}
+    , volumeDefault m{bmColor = Just yellow}
     , net
     , systemCommandSimple m{bmColor = Just red} "hostname" ["-i"] 100000000
     , bat
